@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-electron/
+.vite/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+.DS_Store
