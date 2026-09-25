@@ -47,7 +47,8 @@ button { cursor: pointer; }
 .nav-item.active .nav-icon { color: #e65b6b; }
 .nav-icon { width: 16px; color: #72737a; font-size: 15px; text-align: center; }
 .sidebar-footer { margin-top: auto; }
-.profile-row { display: flex; align-items: center; gap: 9px; margin-top: 18px; padding: 14px 10px 0; border-top: 1px solid #24252a; }
+.profile-row { width: 100%; display: flex; align-items: center; gap: 9px; margin-top: 18px; padding: 14px 10px 0; border: 0; border-top: 1px solid #24252a; color: inherit; background: transparent; text-align: left; }
+.profile-row:hover { background: #1b1b20; }
 .profile-avatar, .message-avatar { display: grid; place-items: center; border-radius: 50%; background: #3a2528; color: #e78a94; font-weight: 700; }
 .profile-avatar { width: 27px; height: 27px; font-size: 11px; }
 .profile-name, .profile-status { margin: 0; }.profile-name { color: #cfced0; font-size: 11px; }.profile-status { margin-top: 2px; color: #66676e; font-size: 10px; }.status-dot { width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #59b58a; box-shadow: 0 0 0 3px rgba(89,181,138,.1); }
@@ -61,3 +62,9 @@ button { cursor: pointer; }
 .auth-panel .muted-copy { max-width: 340px; line-height: 1.7; }
 .auth-button { margin-top: 28px; }
 .auth-error { margin: 16px 0 0; color: #e27a84; font-size: 11px; line-height: 1.5; }
+.account-strip, .account-setting { display: flex; align-items: center; gap: 13px; border: 1px solid #292a30; background: #111216; }
+.account-strip { margin: 13px 0; padding: 16px 20px; }
+.account-strip strong, .account-setting p { display: block; margin: 3px 0 0; color: #d4d0ce; font-size: 12px; font-weight: 500; }
+.account-strip span, .account-setting span { display: block; margin-top: 4px; color: #6d6e75; font-size: 10px; }
+.account-strip .text-button, .account-setting .text-button { margin-left: auto; }
+.account-setting { min-height: 78px; padding: 0 21px; border-bottom: 1px solid #24252a; }

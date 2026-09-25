@@ -5,7 +5,7 @@
   "description": "SCARLET personal AI desktop assistant",
   "packageManager": "pnpm@12.3.4",
   "scripts": {
-    "dev": "concurrently -k \"vite --config apps/web/vite.config.ts\" \"tsc -p apps/desktop/electron/tsconfig.json --watch\" \"wait-on http://localhost:5173 dist-electron/main.js && electron dist-electron/main.js\"",
+    "dev": "concurrently -k \"vite --config apps/web/vite.config.ts\" \"tsc -p apps/desktop/electron/tsconfig.json --watch\" \"wait-on http://localhost:5173 dist-electron/main.js && (command -v xvfb-run >/dev/null 2>&1 && xvfb-run -a electron dist-electron/main.js || electron dist-electron/main.js)\"",
     "build": "pnpm typecheck && tsc -p apps/desktop/electron/tsconfig.json && vite build --config apps/web/vite.config.ts",
     "typecheck": "tsc -p apps/web/tsconfig.json --noEmit && tsc -p apps/desktop/electron/tsconfig.json --noEmit",
     "start": "vite preview --config apps/web/vite.config.ts --host 0.0.0.0 --port ${PORT:-4173}",
