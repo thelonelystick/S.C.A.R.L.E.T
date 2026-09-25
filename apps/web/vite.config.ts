@@ -11,6 +11,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  preview: {
+    allowedHosts: ['s-c-a-r-l-e-t.onrender.com'],
+  },
   build: {
     outDir: '../../dist',
     emptyOutDir: true,
