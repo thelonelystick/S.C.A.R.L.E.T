@@ -1,12 +1,9 @@
-import { FormEvent, ReactElement, useState } from 'react';
+import { FormEvent, ReactElement, useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { loadWorkspaceState, saveWorkspaceState, type Expense, type Memory, type Message, type RoutineItem, type Task, type WorkspaceState } from './lib/persistence';
+import { isSupabaseConfigured, signInWithGoogle, supabase } from './lib/supabase';
 
 type View = 'dashboard' | 'chat' | 'tasks' | 'budget' | 'routine' | 'memory' | 'settings';
-type Message = { role: 'user' | 'assistant'; text: string; time: string };
-type Task = { id: number; title: string; due: string; priority: 'High' | 'Medium' | 'Low'; completed: boolean };
-type Expense = { id: number; description: string; category: string; amount: number; date: string };
-type RoutineItem = { id: number; title: string; time: string; days: string; enabled: boolean };
-type Memory = { id: number; type: string; content: string; updated: string };
-
 const navigation: { id: View; label: string; icon: string }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: '⌂' },
   { id: 'chat', label: 'Chat', icon: '◌' },
@@ -45,6 +42,16 @@ const initialMemories: Memory[] = [
   { id: 2, type: 'Project', content: 'My project is called SCARLET.', updated: 'Updated yesterday' },
 ];
 
+const initialWorkspace: WorkspaceState = {
+  messages: initialMessages,
+  tasks: initialTasks,
+  expenses: initialExpenses,
+  routines: initialRoutine,
+  memories: initialMemories,
+  voice: true,
+  launch: false,
+};
+
 const getGreeting = (): string => {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';
@@ -53,13 +60,62 @@ const getGreeting = (): string => {
 };
 
 function App(): ReactElement {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [workspaceReady, setWorkspaceReady] = useState(!isSupabaseConfigured);
+  const [authError, setAuthError] = useState('');
   const [activeView, setActiveView] = useState<View>('dashboard');
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>(initialWorkspace.messages);
   const [draft, setDraft] = useState('');
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
-  const [routines, setRoutines] = useState<RoutineItem[]>(initialRoutine);
-  const [memories, setMemories] = useState<Memory[]>(initialMemories);
+  const [tasks, setTasks] = useState<Task[]>(initialWorkspace.tasks);
+  const [expenses, setExpenses] = useState<Expense[]>(initialWorkspace.expenses);
+  const [routines, setRoutines] = useState<RoutineItem[]>(initialWorkspace.routines);
+  const [memories, setMemories] = useState<Memory[]>(initialWorkspace.memories);
+  const [voice, setVoice] = useState(initialWorkspace.voice);
+  const [launch, setLaunch] = useState(initialWorkspace.launch);
+
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setWorkspaceReady(false);
+      setUser(session?.user ?? null);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (authLoading || (isSupabaseConfigured && !user)) return;
+    setWorkspaceReady(false);
+    void loadWorkspaceState(user, initialWorkspace)
+      .then((state) => {
+        setMessages(state.messages);
+        setTasks(state.tasks);
+        setExpenses(state.expenses);
+        setRoutines(state.routines);
+        setMemories(state.memories);
+        setVoice(state.voice);
+        setLaunch(state.launch);
+        setWorkspaceReady(true);
+      })
+      .catch((error: unknown) => {
+        setAuthError(error instanceof Error ? error.message : 'Unable to load workspace data.');
+        setWorkspaceReady(true);
+      });
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    if (!workspaceReady) return;
+    void saveWorkspaceState(user, { messages, tasks, expenses, routines, memories, voice, launch }).catch((error: unknown) => {
+      setAuthError(error instanceof Error ? error.message : 'Unable to save workspace data.');
+    });
+  }, [workspaceReady, user, messages, tasks, expenses, routines, memories, voice, launch]);
+
+  if (authLoading || !workspaceReady) return <LoadingScreen />;
+  if (isSupabaseConfigured && !user) return <AuthScreen error={authError} onSignIn={() => { setAuthError(''); void signInWithGoogle().catch((error: unknown) => setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.')); }} />;
 
   const openChat = (): void => setActiveView('chat');
 
@@ -95,11 +151,15 @@ function App(): ReactElement {
 
       <main className="main-panel">
         <header className="topbar"><div><p className="eyebrow">Friday, September 25, 2026</p><h1>{activeView === 'dashboard' ? `${getGreeting()}, Alex` : navigation.find((item) => item.id === activeView)?.label ?? 'Settings'}</h1></div><div className="topbar-actions"><span className="connection-state"><span className="status-dot" /> Local and private</span><button className="icon-button" title="Minimize to tray" onClick={() => window.scarlet?.minimizeToTray()}>—</button></div></header>
-          {activeView === 'dashboard' ? <Dashboard onOpenChat={openChat} /> : activeView === 'chat' ? <Chat messages={messages} draft={draft} setDraft={setDraft} sendMessage={sendMessage} /> : activeView === 'tasks' ? <Tasks tasks={tasks} setTasks={setTasks} /> : activeView === 'budget' ? <Budget expenses={expenses} setExpenses={setExpenses} /> : activeView === 'routine' ? <Routine routines={routines} setRoutines={setRoutines} /> : activeView === 'memory' ? <MemoryView memories={memories} setMemories={setMemories} /> : <Settings />}
+          {activeView === 'dashboard' ? <Dashboard onOpenChat={openChat} /> : activeView === 'chat' ? <Chat messages={messages} draft={draft} setDraft={setDraft} sendMessage={sendMessage} /> : activeView === 'tasks' ? <Tasks tasks={tasks} setTasks={setTasks} /> : activeView === 'budget' ? <Budget expenses={expenses} setExpenses={setExpenses} /> : activeView === 'routine' ? <Routine routines={routines} setRoutines={setRoutines} /> : activeView === 'memory' ? <MemoryView memories={memories} setMemories={setMemories} /> : <Settings voice={voice} launch={launch} onVoiceChange={() => setVoice(!voice)} onLaunchChange={() => setLaunch(!launch)} onSignOut={() => void supabase?.auth.signOut()} />}
       </main>
     </div>
   );
 }
+
+function LoadingScreen(): ReactElement { return <div className="auth-shell"><div className="auth-panel"><div className="brand-mark">S</div><p className="section-kicker">SCARLET</p><h1>Restoring your workspace</h1><p className="muted-copy">Connecting your saved conversations and routines.</p></div></div>; }
+
+function AuthScreen({ error, onSignIn }: { error: string; onSignIn: () => void }): ReactElement { return <div className="auth-shell"><div className="auth-panel"><div className="brand-mark">S</div><p className="section-kicker">SCARLET</p><h1>Your workspace, wherever you are.</h1><p className="muted-copy">Sign in with Google to keep conversations, tasks, budgets, routines, and memories synced securely.</p><button className="primary-button auth-button" onClick={onSignIn}>Continue with Google <span>→</span></button>{error && <p className="auth-error">{error}</p>}</div></div>; }
 
 function Dashboard({ onOpenChat }: { onOpenChat: () => void }): ReactElement {
   return <div className="content dashboard-content">
@@ -152,10 +212,8 @@ function MemoryView({ memories, setMemories }: { memories: Memory[]; setMemories
   return <div className="content workspace-content"><PageIntro eyebrow={`${memories.length} stored memories`} title="Memory" detail="Review the useful things SCARLET is allowed to remember." action={<button className="primary-button" onClick={() => setMemories([{ id: Date.now(), type: 'Fact', content: 'New memory to review.', updated: 'Added just now' }, ...memories])}>＋ Add memory</button>} /><div className="notice-strip"><span>◇</span><p>Memories are explicit and removable. Nothing is stored silently in this phase.</p></div><div className="memory-grid">{memories.map((memory) => <div className="memory-card" key={memory.id}><div className="memory-card-top"><span className="memory-type">{memory.type}</span><button className="row-action" onClick={() => setMemories(memories.filter((item) => item.id !== memory.id))} aria-label={`Forget memory: ${memory.content}`}>×</button></div><p>{memory.content}</p><span className="memory-updated">{memory.updated}</span></div>)}</div></div>;
 }
 
-function Settings(): ReactElement {
-  const [voice, setVoice] = useState(true);
-  const [launch, setLaunch] = useState(false);
-  return <div className="content workspace-content"><PageIntro eyebrow="Workspace" title="Settings" detail="Shape how SCARLET feels and where it keeps your information." /><div className="settings-panel"><SettingRow title="Voice responses" detail="Allow spoken responses when voice providers are connected." enabled={voice} onToggle={() => setVoice(!voice)} /><SettingRow title="Launch at startup" detail="Keep SCARLET close at hand when your computer starts." enabled={launch} onToggle={() => setLaunch(!launch)} /><div className="setting-row"><div><p>AI provider</p><span>Configured in the secure desktop process</span></div><span className="setting-value">Not connected</span></div><div className="setting-row"><div><p>Data location</p><span>Reserved for the local application database</span></div><span className="setting-value">Local</span></div></div></div>;
+function Settings({ voice, launch, onVoiceChange, onLaunchChange, onSignOut }: { voice: boolean; launch: boolean; onVoiceChange: () => void; onLaunchChange: () => void; onSignOut: () => void }): ReactElement {
+  return <div className="content workspace-content"><PageIntro eyebrow="Workspace" title="Settings" detail="Shape how SCARLET feels and where it keeps your information." /><div className="settings-panel"><SettingRow title="Voice responses" detail="Allow spoken responses when voice providers are connected." enabled={voice} onToggle={onVoiceChange} /><SettingRow title="Launch at startup" detail="Keep SCARLET close at hand when your computer starts." enabled={launch} onToggle={onLaunchChange} /><div className="setting-row"><div><p>AI provider</p><span>Configured in the secure desktop process</span></div><span className="setting-value">Not connected</span></div><div className="setting-row"><div><p>Data location</p><span>{isSupabaseConfigured ? 'Encrypted Supabase workspace' : 'Local browser storage'}</span></div><span className="setting-value">{isSupabaseConfigured ? 'Synced' : 'Local'}</span></div><div className="setting-row"><div><p>Account</p><span>Google authentication and workspace sync</span></div><button className="text-button" onClick={onSignOut}>Sign out</button></div></div></div>;
 }
 
 function SettingRow({ title, detail, enabled, onToggle }: { title: string; detail: string; enabled: boolean; onToggle: () => void }): ReactElement { return <div className="setting-row"><div><p>{title}</p><span>{detail}</span></div><button className={`toggle ${enabled ? 'on' : ''}`} onClick={onToggle} aria-label={`Toggle ${title}`}><span /></button></div>; }

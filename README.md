@@ -2,7 +2,7 @@
 
 SCARLET is a local-first personal AI desktop assistant. It is being built incrementally as a practical personal operating system for conversations, tasks, budgets, routines, memory, and voice.
 
-## Phase 2 status
+## Current status
 
 The initial desktop foundation is complete:
 
@@ -13,8 +13,11 @@ The initial desktop foundation is complete:
 - Workspace scripts for development, typechecking, building, and previewing
 - Functional local task, budget, routine, memory, and settings views
 - Local interactions for creating, completing, deleting, toggling, and reviewing workspace items
+- Google sign-in through Supabase Auth
+- Persistent workspace state in Supabase Postgres with per-user row-level security
+- Local browser storage fallback when Supabase credentials are not configured
 
-The product UI currently provides the dashboard, interactive local chat shell, and the core workspace views. These interactions are renderer-local until the SQLite/Drizzle persistence phase. AI providers, voice providers, and agent tools remain intentionally deferred rather than represented as fake functionality.
+The product UI provides the dashboard, interactive chat shell, and core workspace views. AI providers, voice providers, and agent tools remain intentionally deferred rather than represented as fake functionality.
 
 ## Stack
 
@@ -24,8 +27,9 @@ The product UI currently provides the dashboard, interactive local chat shell, a
 - Vite
 - Tailwind CSS
 - pnpm workspaces
+- Supabase Auth and Postgres
 
-SQLite, Drizzle ORM, Zustand, Zod, AI provider abstractions, and voice providers will be added in their respective phases.
+SQLite, Drizzle ORM, Zustand, Zod, AI provider abstractions, and voice providers remain future options.
 
 ## Structure
 
@@ -56,16 +60,21 @@ For a Render web service, use `pnpm install --frozen-lockfile && pnpm build` as 
 
 Electron may require approving native dependency build scripts in environments that use pnpm's build approval policy. Run `pnpm approve-builds` and approve Electron if the desktop binary is unavailable.
 
-## Configuration
+## Supabase configuration
 
-Copy `.env.example` to `.env` when provider configuration is introduced. Secrets belong only in the Electron/main process and must never be placed in renderer code.
+1. Create a Supabase project and copy `.env.example` to `.env`.
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from Supabase Project Settings > API.
+3. In Supabase Authentication > Providers, enable Google and add the Google OAuth client ID and client secret there.
+4. Add `http://localhost:5173` to Supabase Authentication > URL Configuration > Redirect URLs for development. Add the production renderer URL before deployment.
+5. Run `supabase/schema.sql` in the Supabase SQL Editor. It creates the per-user workspace table and RLS policies.
+
+The `VITE_SUPABASE_ANON_KEY` is a browser-safe public key. Never put a Google client secret, Supabase service-role key, or other private API key in `.env` variables prefixed with `VITE_` or in renderer code. When Supabase is not configured, the app uses `localStorage` so the UI remains usable; durable cross-device sync requires the two Supabase values above.
 
 ## Roadmap
 
 1. Project setup and secure desktop shell
 2. UI foundation
-3. SQLite and Drizzle persistence
-4. Task, budget, and routine CRUD
+3. Task, budget, and routine CRUD
 5. Replaceable AI provider, agent context, and tool registry
 6. Explicit memory storage and search
 7. Speech-to-text and text-to-speech provider abstractions
