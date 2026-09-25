@@ -61,6 +61,10 @@ function App(): ReactElement {
     void supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
       setAuthLoading(false);
+    }).catch((error: unknown) => {
+      setAuthError(error instanceof Error ? error.message : 'Unable to connect to authentication.');
+      setUser(null);
+      setAuthLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setWorkspaceReady(false);
@@ -70,7 +74,11 @@ function App(): ReactElement {
   }, []);
 
   useEffect(() => {
-    if (authLoading || (isSupabaseConfigured && !user)) return;
+    if (authLoading) return;
+    if (isSupabaseConfigured && !user) {
+      setWorkspaceReady(true);
+      return;
+    }
     setWorkspaceReady(false);
     void loadWorkspaceState(user, initialWorkspace)
       .then((state) => {
