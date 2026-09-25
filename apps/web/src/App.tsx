@@ -14,33 +14,15 @@ const navigation: { id: View; label: string; icon: string }[] = [
 ];
 
 const initialMessages: Message[] = [
-  { role: 'assistant', text: 'Good morning. I am ready when you are.', time: '09:41' },
-  { role: 'user', text: 'What should I focus on today?', time: '09:42' },
-  { role: 'assistant', text: 'You have two tasks due today and your next routine starts at 18:30. I can help you plan the rest.', time: '09:42' },
 ];
 
-const initialTasks: Task[] = [
-  { id: 1, title: 'Finish project proposal', due: 'Today', priority: 'High', completed: false },
-  { id: 2, title: 'Review study notes', due: 'Today', priority: 'Medium', completed: false },
-  { id: 3, title: 'Morning planning', due: 'Completed 09:10', priority: 'Low', completed: true },
-];
+const initialTasks: Task[] = [];
 
-const initialExpenses: Expense[] = [
-  { id: 1, description: 'Groceries', category: 'Food', amount: 1240, date: 'Sep 24' },
-  { id: 2, description: 'Metro recharge', category: 'Transport', amount: 500, date: 'Sep 22' },
-  { id: 3, description: 'Notebook', category: 'Education', amount: 280, date: 'Sep 20' },
-];
+const initialExpenses: Expense[] = [];
 
-const initialRoutine: RoutineItem[] = [
-  { id: 1, title: 'Evening walk', time: '18:30', days: 'Every day', enabled: true },
-  { id: 2, title: 'Read', time: '21:00', days: 'Mon · Wed · Fri', enabled: true },
-  { id: 3, title: 'Weekly planning', time: '09:00', days: 'Sunday', enabled: false },
-];
+const initialRoutine: RoutineItem[] = [];
 
-const initialMemories: Memory[] = [
-  { id: 1, type: 'Preference', content: 'I prefer short, direct answers.', updated: 'Updated today' },
-  { id: 2, type: 'Project', content: 'My project is called SCARLET.', updated: 'Updated yesterday' },
-];
+const initialMemories: Memory[] = [];
 
 const initialWorkspace: WorkspaceState = {
   messages: initialMessages,
@@ -115,7 +97,7 @@ function App(): ReactElement {
   }, [workspaceReady, user, messages, tasks, expenses, routines, memories, voice, launch]);
 
   if (authLoading || !workspaceReady) return <LoadingScreen />;
-  if (isSupabaseConfigured && !user) return <AuthScreen error={authError} onSignIn={() => { setAuthError(''); void signInWithGoogle().catch((error: unknown) => setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.')); }} />;
+  if (!user) return <AuthScreen configured={isSupabaseConfigured} error={authError} onSignIn={() => { setAuthError(''); void signInWithGoogle().catch((error: unknown) => setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.')); }} />;
 
   const openChat = (): void => setActiveView('chat');
 
@@ -155,7 +137,7 @@ function App(): ReactElement {
 
       <main className="main-panel">
         <header className="topbar"><div><p className="eyebrow">Friday, September 25, 2026</p><h1>{activeView === 'dashboard' ? `${getGreeting()}, Alex` : navigation.find((item) => item.id === activeView)?.label ?? 'Settings'}</h1></div><div className="topbar-actions"><span className="connection-state"><span className="status-dot" /> Local and private</span><button className="icon-button" title="Minimize to tray" onClick={() => window.scarlet?.minimizeToTray()}>—</button></div></header>
-          {activeView === 'dashboard' ? <Dashboard user={user} onOpenChat={openChat} onSignOut={signOut} /> : activeView === 'chat' ? <Chat messages={messages} draft={draft} setDraft={setDraft} sendMessage={sendMessage} /> : activeView === 'tasks' ? <Tasks tasks={tasks} setTasks={setTasks} /> : activeView === 'budget' ? <Budget expenses={expenses} setExpenses={setExpenses} /> : activeView === 'routine' ? <Routine routines={routines} setRoutines={setRoutines} /> : activeView === 'memory' ? <MemoryView memories={memories} setMemories={setMemories} /> : <Settings user={user} voice={voice} launch={launch} onVoiceChange={() => setVoice(!voice)} onLaunchChange={() => setLaunch(!launch)} onSignOut={signOut} />}
+          {activeView === 'dashboard' ? <Dashboard user={user} tasks={tasks} expenses={expenses} routines={routines} onOpenChat={openChat} onOpenTasks={() => setActiveView('tasks')} onOpenRoutine={() => setActiveView('routine')} onSignOut={signOut} /> : activeView === 'chat' ? <Chat messages={messages} draft={draft} setDraft={setDraft} sendMessage={sendMessage} /> : activeView === 'tasks' ? <Tasks tasks={tasks} setTasks={setTasks} /> : activeView === 'budget' ? <Budget expenses={expenses} setExpenses={setExpenses} /> : activeView === 'routine' ? <Routine routines={routines} setRoutines={setRoutines} /> : activeView === 'memory' ? <MemoryView memories={memories} setMemories={setMemories} /> : <Settings user={user} voice={voice} launch={launch} onVoiceChange={() => setVoice(!voice)} onLaunchChange={() => setLaunch(!launch)} onSignOut={signOut} />}
       </main>
     </div>
   );
@@ -163,15 +145,18 @@ function App(): ReactElement {
 
 function LoadingScreen(): ReactElement { return <div className="auth-shell"><div className="auth-panel"><div className="brand-mark">S</div><p className="section-kicker">SCARLET</p><h1>Restoring your workspace</h1><p className="muted-copy">Connecting your saved conversations and routines.</p></div></div>; }
 
-function AuthScreen({ error, onSignIn }: { error: string; onSignIn: () => void }): ReactElement { return <div className="auth-shell"><div className="auth-panel"><div className="brand-mark">S</div><p className="section-kicker">SCARLET</p><h1>Your workspace, wherever you are.</h1><p className="muted-copy">Sign in with Google to keep conversations, tasks, budgets, routines, and memories synced securely.</p><button className="primary-button auth-button" onClick={onSignIn}>Continue with Google <span>→</span></button>{error && <p className="auth-error">{error}</p>}</div></div>; }
+function AuthScreen({ configured, error, onSignIn }: { configured: boolean; error: string; onSignIn: () => void }): ReactElement { return <div className="auth-shell"><div className="auth-panel"><div className="brand-mark">S</div><p className="section-kicker">SCARLET</p><h1>Your workspace, wherever you are.</h1><p className="muted-copy">Sign in with Google to keep conversations, tasks, budgets, routines, and memories synced securely.</p><button className="primary-button auth-button" onClick={onSignIn} disabled={!configured}>Continue with Google <span>→</span></button>{!configured && <p className="auth-error">Google login is not configured on this deployment. Add the Supabase environment variables in Render.</p>}{error && <p className="auth-error">{error}</p>}</div></div>; }
 
-function Dashboard({ user, onOpenChat, onSignOut }: { user: User | null; onOpenChat: () => void; onSignOut: () => void }): ReactElement {
+function Dashboard({ user, tasks, expenses, routines, onOpenChat, onOpenTasks, onOpenRoutine, onSignOut }: { user: User | null; tasks: Task[]; expenses: Expense[]; routines: RoutineItem[]; onOpenChat: () => void; onOpenTasks: () => void; onOpenRoutine: () => void; onSignOut: () => void }): ReactElement {
+  const pendingTasks = tasks.filter((task) => !task.completed);
+  const nextRoutine = routines.find((routine) => routine.enabled);
+  const spent = expenses.reduce((total, expense) => total + expense.amount, 0);
   return <div className="content dashboard-content">
     <section className="welcome-panel"><div><p className="section-kicker">Your day at a glance</p><h2>A clear mind starts with a clear next step.</h2><p className="muted-copy">SCARLET is ready to help you stay focused, one useful action at a time.</p></div><button className="primary-button" onClick={onOpenChat}>Ask SCARLET <span>→</span></button></section>
-    <section className="metric-grid"><MetricCard label="Tasks" value="2" detail="pending today" accent="scarlet" /><MetricCard label="Budget" value="₹ 18,420" detail="remaining this month" accent="gold" /><MetricCard label="Routine" value="18:30" detail="next activity · Evening walk" accent="mint" /></section>
-    <section className="account-strip"><div className="profile-avatar">{user?.email?.slice(0, 1).toUpperCase() ?? 'A'}</div><div><p className="section-kicker">Account</p><strong>{user?.email ?? 'Local workspace'}</strong><span>{user ? 'Synced with Google and Supabase' : 'Saved in this browser'}</span></div>{user && <button className="text-button" onClick={onSignOut}>Sign out</button>}</section>
-    <section className="lower-grid"><div className="surface-panel"><div className="panel-heading"><div><p className="section-kicker">Today</p><h3>Priorities</h3></div><button className="text-button">View tasks →</button></div><div className="priority-row"><span className="priority-marker high" /><div><p>Finish project proposal</p><span>Due today · High priority</span></div><span className="row-arrow">›</span></div><div className="priority-row"><span className="priority-marker medium" /><div><p>Review study notes</p><span>Due today · Medium priority</span></div><span className="row-arrow">›</span></div><div className="priority-row complete"><span className="priority-marker done">✓</span><div><p>Morning planning</p><span>Completed at 09:10</span></div></div></div><div className="surface-panel"><div className="panel-heading"><div><p className="section-kicker">Coming up</p><h3>Routine</h3></div><button className="text-button">Open routine →</button></div><div className="routine-highlight"><div className="routine-time">18:30</div><div><p>Evening walk</p><span>Today · 30 minutes</span></div></div><div className="routine-highlight"><div className="routine-time muted-time">21:00</div><div><p>Read</p><span>Today · 45 minutes</span></div></div></div></section>
-    <section className="activity-line"><span className="activity-pulse" /><span>Workspace is ready</span><span className="activity-separator">·</span><span>Last synced locally just now</span></section>
+    <section className="metric-grid"><MetricCard label="Tasks" value={String(pendingTasks.length)} detail="pending tasks" accent="scarlet" /><MetricCard label="Budget" value={`₹ ${(20000 - spent).toLocaleString('en-IN')}`} detail="remaining this month" accent="gold" /><MetricCard label="Routine" value={nextRoutine?.time ?? '--:--'} detail={nextRoutine?.title ?? 'no routine planned'} accent="mint" /></section>
+    <section className="account-strip"><div className="profile-avatar">{user?.email?.slice(0, 1).toUpperCase() ?? 'A'}</div><div><p className="section-kicker">Account</p><strong>{user?.email ?? 'Account'}</strong><span>Synced with Google and Supabase</span></div><button className="text-button" onClick={onSignOut}>Sign out</button></section>
+    <section className="lower-grid"><div className="surface-panel"><div className="panel-heading"><div><p className="section-kicker">Today</p><h3>Priorities</h3></div><button className="text-button" onClick={onOpenTasks}>View tasks →</button></div>{pendingTasks.length === 0 ? <div className="empty-panel"><p>No tasks yet.</p><span>Add your first task to build today&apos;s priorities.</span></div> : pendingTasks.slice(0, 3).map((task) => <div className="priority-row" key={task.id}><span className={`priority-marker ${task.priority.toLowerCase()}`} /><div><p>{task.title}</p><span>{task.due} · {task.priority} priority</span></div><span className="row-arrow">›</span></div>)}</div><div className="surface-panel"><div className="panel-heading"><div><p className="section-kicker">Coming up</p><h3>Routine</h3></div><button className="text-button" onClick={onOpenRoutine}>Open routine →</button></div>{nextRoutine ? <div className="routine-highlight"><div className="routine-time">{nextRoutine.time}</div><div><p>{nextRoutine.title}</p><span>{nextRoutine.days}</span></div></div> : <div className="empty-panel"><p>No routine planned.</p><span>Add a routine to see what&apos;s next.</span></div>}</div></section>
+    <section className="activity-line"><span className="activity-pulse" /><span>Workspace is ready</span><span className="activity-separator">·</span><span>Synced to your account</span></section>
   </div>;
 }
 
