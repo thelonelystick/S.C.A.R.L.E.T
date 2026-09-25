@@ -50,6 +50,10 @@ pnpm typecheck
 pnpm build
 ```
 
+## Render deployment
+
+For a Render web service, use `pnpm install --frozen-lockfile && pnpm build` as the build command and `pnpm start` as the start command. The start script serves the built renderer on `0.0.0.0` and uses Render's `PORT` environment variable.
+
 Electron may require approving native dependency build scripts in environments that use pnpm's build approval policy. Run `pnpm approve-builds` and approve Electron if the desktop binary is unavailable.
 
 ## Configuration
