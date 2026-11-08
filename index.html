@@ -27,25 +27,8 @@
           <span aria-hidden="true">＋</span> New conversation
         </button>
 
-        <nav class="primary-nav" aria-label="Workspace">
-          <button class="nav-link is-active" type="button" data-view="Chat">
-            <span class="nav-icon" aria-hidden="true">◉</span> Chat
-          </button>
-          <button class="nav-link" type="button" data-view="Planner">
-            <span class="nav-icon" aria-hidden="true">▤</span> Planner
-          </button>
-          <button class="nav-link" type="button" data-view="Memory">
-            <span class="nav-icon" aria-hidden="true">◇</span> Memory
-          </button>
-          <button class="nav-link" type="button" data-view="Projects">
-            <span class="nav-icon" aria-hidden="true">▣</span> Projects
-          </button>
-          <button class="nav-link" type="button" data-view="Activity">
-            <span class="nav-icon" aria-hidden="true">◷</span> Activity
-          </button>
-        </nav>
-
-        <a class="admin-link" href="/admin">Admin dashboard <span aria-hidden="true">↗</span></a>
+        <p class="sidebar-label">QUICK MODES</p>
+        <nav class="primary-nav" id="quick-mode-list" aria-label="Quick modes"></nav>
 
         <button class="profile-button" id="profile-button" type="button" aria-haspopup="dialog">
           <span class="profile-avatar" aria-hidden="true">S</span>
@@ -80,25 +63,19 @@
         <div class="workspace-scroll" id="workspace-scroll">
           <section class="welcome" id="welcome" aria-labelledby="welcome-title">
             <div class="welcome-content">
-              <div class="sparkle-mark" aria-hidden="true">
-                <svg viewBox="0 0 32 32" fill="none">
-                  <path d="M16 4v24M4 16h24M7.5 7.5l17 17m0-17-17 17" />
-                </svg>
-              </div>
-              <p class="eyebrow">A LITTLE MORE YOU, EVERY DAY</p>
-              <h1 id="welcome-title">Think clearly.<br class="mobile-break" /><span>Become more.</span></h1>
-              <p class="welcome-description">
-                Your thoughts, plans, ambitions, and questions — all in one place.<br class="desktop-break" />
-                I’m here to help you make sense of it all.
-              </p>
-
-              <section class="quick-modes" aria-label="Your selected chat modes">
-                <div class="quick-modes-heading">
-                  <span>QUICK MODES</span>
-                  <button class="manage-plugins-button" id="manage-plugins" type="button">Manage plugins</button>
+              <div class="welcome-intro" id="welcome-intro">
+                <div class="sparkle-mark" aria-hidden="true">
+                  <svg viewBox="0 0 32 32" fill="none">
+                    <path d="M16 4v24M4 16h24M7.5 7.5l17 17m0-17-17 17" />
+                  </svg>
                 </div>
-                <div class="quick-mode-list" id="quick-mode-list"></div>
-              </section>
+                <p class="eyebrow">A LITTLE MORE YOU, EVERY DAY</p>
+                <h1 id="welcome-title">Think clearly.<br class="mobile-break" /><span>Become more.</span></h1>
+                <p class="welcome-description">
+                  Your thoughts, plans, ambitions, and questions — all in one place.<br class="desktop-break" />
+                  I’m here to help you make sense of it all.
+                </p>
+              </div>
 
               <div class="prompt-suggestions" aria-label="Ideas to get started">
                 <button class="suggestion-card" type="button" data-prompt="Help me think something through">

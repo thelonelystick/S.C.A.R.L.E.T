@@ -18,6 +18,8 @@ function initializeChat() {
   const sendButton = document.querySelector("#send-button");
   const conversation = document.querySelector("#conversation");
   const suggestions = document.querySelector(".prompt-suggestions");
+  const welcomeContent = document.querySelector(".welcome-content");
+  const welcomeIntro = document.querySelector("#welcome-intro");
   const sidebar = document.querySelector("#sidebar");
   const menuButton = document.querySelector("#menu-button");
   const toast = document.querySelector("#toast");
@@ -30,6 +32,7 @@ function initializeChat() {
   const selectionCount = document.querySelector("#plugin-selection-count");
 
   let toastTimeout;
+  let introExitTimeout;
   let activePluginId;
 
   function showToast(message) {
@@ -41,7 +44,6 @@ function initializeChat() {
 
   function scrollToLatestMessage() {
     window.requestAnimationFrame(() => {
-      conversation.scrollTop = conversation.scrollHeight;
       workspace.scrollTop = workspace.scrollHeight;
     });
   }
@@ -59,6 +61,7 @@ function initializeChat() {
 
     if (currentPlugin) activePluginId = currentPlugin.id;
     messageInput.placeholder = `Message S.C.A.R.L.E.T. in ${currentPlugin?.name ?? "Chat"}...`;
+    currentSection.textContent = currentPlugin?.name ?? "Chat";
     quickModeList.replaceChildren();
     profilePluginCount.textContent = String(selectedPlugins.length);
 
@@ -72,14 +75,22 @@ function initializeChat() {
 
     for (const plugin of selectedPlugins) {
       const button = document.createElement("button");
-      button.className = "quick-mode";
+      button.className = "nav-link";
       button.type = "button";
-      button.textContent = plugin.name;
+      button.dataset.pluginId = plugin.id;
       button.setAttribute("aria-pressed", String(plugin.id === activePluginId));
+      button.classList.toggle("is-active", plugin.id === activePluginId);
+      const icon = document.createElement("span");
+      icon.className = "nav-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = plugin.name === "Chat" ? "◉" : "◇";
+      button.append(icon, document.createTextNode(plugin.name));
       button.addEventListener("click", () => {
         activePluginId = plugin.id;
         renderQuickModes();
-        messageInput.placeholder = `Message S.C.A.R.L.E.T. in ${plugin.name}...`;
+        currentSection.textContent = plugin.name;
+        sidebar.classList.remove("is-open");
+        menuButton.setAttribute("aria-expanded", "false");
         messageInput.focus();
       });
       quickModeList.append(button);
@@ -178,7 +189,12 @@ function initializeChat() {
     const message = text.trim();
     if (!message || sendButton.disabled) return;
 
-    suggestions.hidden = true;
+    welcomeContent.classList.add("is-engaged");
+    window.clearTimeout(introExitTimeout);
+    introExitTimeout = window.setTimeout(() => {
+      welcomeIntro.hidden = true;
+      suggestions.hidden = true;
+    }, 420);
     addMessage(message, "user");
     messageInput.value = "";
     messageInput.style.height = "auto";
@@ -245,32 +261,20 @@ function initializeChat() {
   });
 
   document.querySelector("#new-chat").addEventListener("click", () => {
+    window.clearTimeout(introExitTimeout);
     conversation.replaceChildren();
     suggestions.hidden = false;
+    welcomeIntro.hidden = false;
+    welcomeContent.classList.remove("is-engaged");
     messageInput.value = "";
     messageInput.style.height = "auto";
     messageInput.placeholder = `Message S.C.A.R.L.E.T. in ${activePluginName()}...`;
-    currentSection.textContent = "Chat";
+    currentSection.textContent = activePluginName();
     document.querySelector("#current-conversation").textContent = "New conversation";
-    document.querySelectorAll(".nav-link").forEach((link) => {
-      link.classList.toggle("is-active", link.dataset.view === "Chat");
-    });
+    renderQuickModes();
     sidebar.classList.remove("is-open");
     menuButton.setAttribute("aria-expanded", "false");
     workspace.scrollTo({ top: 0, behavior: "smooth" });
-  });
-
-  document.querySelectorAll(".nav-link").forEach((link) => {
-    link.addEventListener("click", () => {
-      document.querySelector(".nav-link.is-active")?.classList.remove("is-active");
-      link.classList.add("is-active");
-      currentSection.textContent = link.dataset.view;
-      sidebar.classList.remove("is-open");
-      menuButton.setAttribute("aria-expanded", "false");
-      if (link.dataset.view !== "Chat") {
-        showToast(`${link.dataset.view} is coming soon.`);
-      }
-    });
   });
 
   menuButton.addEventListener("click", () => {
@@ -305,10 +309,6 @@ function initializeChat() {
     } catch (error) {
       showToast(`Could not load plugins: ${error.message}`);
     }
-  });
-
-  document.querySelector("#manage-plugins").addEventListener("click", () => {
-    document.querySelector("#profile-button").click();
   });
 
   document.querySelector("#plugins-done").addEventListener("click", () => pluginsDialog.close());
