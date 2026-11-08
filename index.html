@@ -13,7 +13,7 @@
     <script type="module" src="script.js"></script>
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell" id="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Main navigation">
         <a class="brand" href="#" aria-label="S.C.A.R.L.E.T. home">
           <span class="brand-mark" aria-hidden="true">S</span>
@@ -45,24 +45,15 @@
           </button>
         </nav>
 
-        <div class="history">
-          <p class="sidebar-label">YOUR HISTORY</p>
-          <div class="history-list" id="history-list">
-            <button class="history-item is-current" type="button">Welcome to S.C.A.R.L.E.T.</button>
-            <button class="history-item" type="button">Ideas &amp; late-night thoughts</button>
-            <button class="history-item" type="button">Build my next chapter</button>
-            <button class="history-item" type="button">Weekly priorities</button>
-            <button class="history-item" type="button">A plan for the future</button>
-          </div>
-        </div>
+        <a class="admin-link" href="/admin">Admin dashboard <span aria-hidden="true">↗</span></a>
 
-        <button class="profile-button" id="profile-button" type="button">
+        <button class="profile-button" id="profile-button" type="button" aria-haspopup="dialog">
           <span class="profile-avatar" aria-hidden="true">S</span>
           <span class="profile-copy">
-            <strong>Your space</strong>
-            <span>Personal workspace</span>
+            <strong>Your plugins</strong>
+            <span><span id="profile-plugin-count">1</span> of 5 selected</span>
           </span>
-          <span class="profile-chevron" aria-hidden="true">⌄</span>
+          <span class="profile-chevron" aria-hidden="true">⚙</span>
         </button>
       </aside>
 
@@ -100,6 +91,14 @@
                 Your thoughts, plans, ambitions, and questions — all in one place.<br class="desktop-break" />
                 I’m here to help you make sense of it all.
               </p>
+
+              <section class="quick-modes" aria-label="Your selected chat modes">
+                <div class="quick-modes-heading">
+                  <span>QUICK MODES</span>
+                  <button class="manage-plugins-button" id="manage-plugins" type="button">Manage plugins</button>
+                </div>
+                <div class="quick-mode-list" id="quick-mode-list"></div>
+              </section>
 
               <div class="prompt-suggestions" aria-label="Ideas to get started">
                 <button class="suggestion-card" type="button" data-prompt="Help me think something through">
@@ -157,25 +156,60 @@
               </form>
 
               <p class="privacy-note">S.C.A.R.L.E.T. can make mistakes. Think of this as a space to explore, not a substitute for your judgment.</p>
-              <button class="scroll-cue" id="scroll-cue" type="button" aria-label="Explore your workspace">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 4v15m0 0 6-6m-6 6-6-6" />
-                </svg>
-              </button>
-            </div>
-          </section>
-
-          <section class="next-section" id="next-section" aria-labelledby="next-title">
-            <div class="next-section-inner">
-              <p class="eyebrow">YOUR SPACE, YOUR PACE</p>
-              <h2 id="next-title">A little more clarity.<br /><span>One thought at a time.</span></h2>
-              <p>Start wherever you are. S.C.A.R.L.E.T. will help you find the next right step.</p>
-              <button class="return-button" id="return-button" type="button">Back to your conversation <span aria-hidden="true">↑</span></button>
             </div>
           </section>
         </div>
       </main>
     </div>
+
+    <main class="admin-page" id="admin-page" hidden>
+      <header class="admin-topbar">
+        <a class="brand admin-brand" href="/" aria-label="Back to S.C.A.R.L.E.T.">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span class="brand-copy">
+            <strong>S.C.A.R.L.E.T.</strong>
+            <span>PLUGIN ADMIN</span>
+          </span>
+        </a>
+        <a class="admin-back-link" href="/">← Back to chat</a>
+      </header>
+      <section class="admin-content" aria-labelledby="admin-title">
+        <p class="eyebrow">WORKSPACE SETTINGS</p>
+        <h1 id="admin-title">Plugin dashboard</h1>
+        <p class="admin-description">Add modes to your plugin catalog or remove modes you no longer need. Your five-plugin selection is managed from your profile.</p>
+
+        <form class="plugin-add-form" id="plugin-add-form">
+          <label for="plugin-name">Add a plugin</label>
+          <div class="plugin-add-controls">
+            <input id="plugin-name" name="plugin" maxlength="40" placeholder="e.g. Travel, Research, Cooking" required />
+            <button class="admin-primary-button" type="submit">Add plugin</button>
+          </div>
+        </form>
+
+        <div class="plugin-list-heading">
+          <h2>Available plugins</h2>
+          <span class="plugin-total" id="plugin-total">0 plugins</span>
+        </div>
+        <div class="admin-plugin-list" id="admin-plugin-list" aria-live="polite"></div>
+        <p class="admin-notice" id="admin-notice" role="status">Changes are saved in this browser only. Shared accounts and cross-device sync need a server connection.</p>
+      </section>
+    </main>
+
+    <dialog class="plugins-dialog" id="plugins-dialog" aria-labelledby="plugins-title">
+      <form method="dialog" class="dialog-close-form">
+        <button class="dialog-close" aria-label="Close plugin settings" value="close">×</button>
+      </form>
+      <p class="eyebrow">MAKE IT YOURS</p>
+      <h2 id="plugins-title">Your chat modes</h2>
+      <p class="dialog-description">Choose up to five plugins for your daily needs. Select a mode below to make it your active chat mode.</p>
+      <p class="plugin-selection-count" id="plugin-selection-count" aria-live="polite"></p>
+      <div class="profile-plugin-list" id="profile-plugin-list"></div>
+      <div class="dialog-footer">
+        <span>Changes save automatically.</span>
+        <button class="admin-primary-button" id="plugins-done" type="button">Done</button>
+      </div>
+    </dialog>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </body>
 </html>
