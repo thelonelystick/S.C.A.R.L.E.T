@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>S.C.A.R.L.E.T. Desktop Companion</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script defer src="/ui.js"></script>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="mark" aria-hidden="true">S</span>
+        <div><b>S.C.A.R.L.E.T.</b><small>DESKTOP COMPANION</small></div>
+      </div>
+      <span id="status">Disconnected</span>
+    </header>
+    <main>
+      <section class="session">
+        <div>
+          <p class="eyebrow">Device controls</p>
+          <h1>Local session</h1>
+          <p>Choose which actions this window can perform on your computer.</p>
+        </div>
+        <button id="session" class="primary" type="button">Open session</button>
+      </section>
+      <p id="feedback" role="status"></p>
+      <div class="grid">
+        <section>
+          <h2>Permissions</h2>
+          <p class="hint">Each grant lasts for this session.</p>
+          <div class="toggles">
+            <label
+              ><span
+                ><b>Folder search</b
+                ><small>Search filenames in one selected folder.</small></span
+              ><input data-permit="folder" type="checkbox" disabled
+            /></label>
+            <label
+              ><span
+                ><b>Read text</b
+                ><small>Open a document with the system picker.</small></span
+              ><input data-permit="read" type="checkbox" disabled
+            /></label>
+            <label
+              ><span
+                ><b>Save text</b
+                ><small
+                  >Create a new TXT file in a chosen location.</small
+                ></span
+              ><input data-permit="save" type="checkbox" disabled
+            /></label>
+            <label
+              ><span
+                ><b>Dashboard</b
+                ><small>Open the loopback address in your browser.</small></span
+              ><input data-permit="dashboard" type="checkbox" disabled
+            /></label>
+            <label
+              ><span
+                ><b>Notifications</b
+                ><small>Request a desktop notification on demand.</small></span
+              ><input data-permit="notify" type="checkbox" disabled
+            /></label>
+          </div>
+        </section>
+        <div class="stack">
+          <section>
+            <h2>Folder search</h2>
+            <p id="folder-label" class="hint">No folder selected.</p>
+            <div class="line">
+              <button disabled id="folder" type="button">Choose folder</button>
+            </div>
+            <form id="search-form" class="line">
+              <input
+                id="query"
+                aria-label="Search selected filenames"
+                placeholder="Search filenames"
+                maxlength="140"
+                disabled
+              /><button disabled id="search">Search</button>
+            </form>
+            <p id="count" class="hint"></p>
+            <ul id="matches"></ul>
+          </section>
+          <section>
+            <h2>Text workspace</h2>
+            <label for="note" class="hint" id="filename">New note</label
+            ><textarea
+              id="note"
+              rows="4"
+              disabled
+              aria-label="Plain text note"
+            ></textarea>
+            <div class="line">
+              <button disabled id="read" type="button">Open file</button
+              ><button disabled id="save" type="button">
+                Save as new file
+              </button>
+            </div>
+          </section>
+          <section>
+            <h2>Desktop actions</h2>
+            <div class="line">
+              <button disabled id="dashboard" type="button">
+                Open dashboard</button
+              ><button disabled id="notify" type="button">
+                Test notification
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+      <section class="activity">
+        <h2>Session activity</h2>
+        <ul id="log"></ul>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+name: scarlet
+x-app-build: &app-build
+  context: .
+  target: app
+x-app-environment: &app-environment
+  NODE_ENV: production
+  PUBLIC_DEPLOYMENT: "${PUBLIC_DEPLOYMENT:-0}"
+  APP_ORIGIN: "${APP_ORIGIN:-http://localhost:3000}"
+  SCARLET_SKIP_MIGRATIONS: "1"
+  TRUST_PROXY: "${TRUST_PROXY:-0}"
+  RESEARCH_HOSTS: "${RESEARCH_HOSTS:-}"
+  DAILY_MODEL_CALLS: "${DAILY_MODEL_CALLS:-40}"
+  EMBEDDING_MODEL: "${EMBEDDING_MODEL:-}"
+  GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+  GOOGLE_REDIRECT_URI: "${GOOGLE_REDIRECT_URI:-}"
+  META_GRAPH_VERSION: "${META_GRAPH_VERSION:-}"
+  AI_COMPATIBLE_BASE_URL: "${AI_COMPATIBLE_BASE_URL:-}"
+x-db-image: &db-image pgvector/pgvector:0.8.7-pg16-bookworm
+x-runtime: &runtime
+  init: true
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment: *app-environment
+  secrets: [pg_app_password, redis_password, master_key, connector_env]
+  networks: [storage, edge]
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+    redis: { condition: service_healthy }
+
+services:
+  db:
+    image: *db-image
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: scarlet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_owner_password
+    secrets: [pg_owner_password]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    networks: [storage]
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -d, scarlet]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  db-bootstrap:
+    image: *db-image
+    restart: "no"
+    networks: [storage]
+    depends_on:
+      db: { condition: service_healthy }
+    secrets: [pg_owner_password, pg_app_password, pg_migration_password]
+    environment: { PGHOST: db, PGUSER: postgres, PGDATABASE: scarlet }
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        export PGPASSWORD="$$(cat /run/secrets/pg_owner_password)"
+        export APP_ROLE_PASSWORD="$$(cat /run/secrets/pg_app_password)"
+        export MIGRATOR_PASSWORD="$$(cat /run/secrets/pg_migration_password)"
+        psql --no-psqlrc --set ON_ERROR_STOP=1 <<'SQL'
+        BEGIN;
+        CREATE EXTENSION IF NOT EXISTS vector;
+        SELECT 'CREATE ROLE scarlet_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='scarlet_app') \gexec
+        SELECT 'CREATE ROLE scarlet_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='scarlet_migrator') \gexec
+        \getenv migrator_password MIGRATOR_PASSWORD
+        ALTER ROLE scarlet_migrator PASSWORD :'migrator_password';
+        \getenv app_password APP_ROLE_PASSWORD
+        ALTER ROLE scarlet_app PASSWORD :'app_password';
+        REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+        GRANT CONNECT ON DATABASE scarlet TO scarlet_app,scarlet_migrator;
+        GRANT USAGE ON SCHEMA public TO scarlet_app;
+        GRANT USAGE, CREATE ON SCHEMA public TO scarlet_migrator;
+        CREATE TABLE IF NOT EXISTS migrations(name text PRIMARY KEY,applied_at timestamptz DEFAULT now());
+        GRANT SELECT, INSERT ON migrations TO scarlet_migrator;
+        GRANT SELECT ON migrations TO scarlet_app;
+        ALTER DEFAULT PRIVILEGES FOR ROLE scarlet_migrator IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO scarlet_app;
+        ALTER DEFAULT PRIVILEGES FOR ROLE scarlet_migrator IN SCHEMA public GRANT USAGE,SELECT ON SEQUENCES TO scarlet_app;
+        COMMIT;
+        SQL
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    user: redis
+    networks: [storage]
+    volumes: [redis_data:/data]
+    tmpfs: [/tmp]
+    secrets: [redis_password]
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        pass="$$(cat /run/secrets/redis_password)"
+        case "$$pass" in ""|*[!a-fA-F0-9]*) exit 64;; esac
+        umask 077
+        { printf 'requirepass %s\n' "$$pass"; printf 'bind 0.0.0.0\nprotected-mode yes\ndir /data\nappendonly yes\nappendfsync everysec\nmaxmemory-policy noeviction\n'; } > /tmp/scarlet-redis.conf
+        exec redis-server /tmp/scarlet-redis.conf
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$(cat /run/secrets/redis_password)" redis-cli ping | grep -qx PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  migrate:
+    image: scarlet-web:local
+    build: *app-build
+    restart: "no"
+    networks: [storage]
+    secrets: [pg_migration_password]
+    environment: { PUBLIC_DEPLOYMENT: "1" }
+    depends_on:
+      db-bootstrap: { condition: service_completed_successfully }
+    command: [npm, run, migrate]
+
+  web:
+    <<: *runtime
+    image: scarlet-web:local
+    build: *app-build
+    ports: ["127.0.0.1:3000:3000"]
+    secrets: [pg_app_password, redis_password, master_key, connector_env, auth_env]
+    command: [node, --env-file=/run/secrets/connector_env, --env-file=/run/secrets/auth_env, node_modules/next/dist/bin/next, start, -H, 0.0.0.0, -p, "3000"]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>r.ok?r.json():null).then(v=>process.exit(v?.database===true?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    <<: *runtime
+    image: scarlet-worker:local
+    build: { context: ., target: worker }
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=${SCARLET_SECCOMP_PATH:-../scarlet-secrets/chromium-seccomp.json}
+    shm_size: 512mb
+    stop_grace_period: 3m
+    command: [node, --env-file-if-exists=.env, --env-file=/run/secrets/connector_env, --import, tsx, scripts/worker.ts]
+    healthcheck:
+      test:
+        - CMD
+        - /usr/local/bin/scarlet-env
+        - node
+        - -e
+        - >-
+          const {Queue}=require('bullmq'); const u=new URL(process.env.REDIS_URL);
+          const q=new Queue('scarlet-scheduler',{connection:{host:u.hostname,port:Number(u.port),password:u.password}});
+          Promise.all([q.getWorkersCount(),q.getJobScheduler('tick')]).then(async ([n,s])=>{await q.close();process.exit(n&&s?0:1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 8s
+      retries: 4
+      start_period: 40s
+
+  proxy:
+    image: caddy:2-alpine
+    profiles: [https]
+    restart: unless-stopped
+    depends_on:
+      web: { condition: service_healthy }
+    networks: [edge]
+    environment:
+      SCARLET_HOST: "${SCARLET_HOST:-localhost}"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports: ["80:80", "443:443", "443:443/udp"]
+
+secrets:
+  pg_owner_password: { file: "${SCARLET_SECRETS_DIR:-../scarlet-secrets}/pg-owner-password" }
+  pg_migration_password: { file: "${SCARLET_SECRETS_DIR:-../scarlet-secrets}/pg-migration-password" }
+  pg_app_password: { file: "${SCARLET_SECRETS_DIR:-../scarlet-secrets}/pg-app-password" }
+  redis_password: { file: "${SCARLET_SECRETS_DIR:-../scarlet-secrets}/redis-password" }
+  master_key: { file: "${SCARLET_SECRETS_DIR:-../scarlet-secrets}/master-key" }
+  auth_env: { file: "${SCARLET_SECRETS_DIR:-../scarlet-secrets}/auth.env" }
+  connector_env: { file: "${SCARLET_SECRETS_DIR:-../scarlet-secrets}/connectors.env" }
+networks:
+  storage: { internal: true }
+  edge: {}
+volumes:
+  postgres_data: {}
+  redis_data: {}
+  caddy_data: {}
+  caddy_config: {}

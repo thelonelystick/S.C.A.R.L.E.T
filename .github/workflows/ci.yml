@@ -1,0 +1,89 @@
+name: Verify S.C.A.R.L.E.T.
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      CHROMIUM_PATH: /usr/bin/google-chrome
+      PREVIEW_URL: http://127.0.0.1:4317
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm }
+      - run: npm ci
+      - run: npm run typecheck && npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Verify the local browser workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SCARLET_DATA_DIR="$RUNNER_TEMP/scarlet-local"
+          npm run migrate
+          npm start -- -p 4317 > "$RUNNER_TEMP/scarlet-next.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 2 "$PREVIEW_URL/api/health" > /dev/null
+          npm run test:e2e
+
+  deployment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize disposable test configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cfg="$RUNNER_TEMP/scarlet-deploy"
+          install -m 700 -d "$cfg"
+          for file in pg-owner-password pg-migration-password pg-app-password redis-password; do openssl rand -hex 32 > "$cfg/$file"; done
+          openssl rand -base64 32 > "$cfg/master-key"
+          touch "$cfg/connectors.env" "$cfg/auth.env"
+          curl -fsSL --retry 3 https://raw.githubusercontent.com/microsoft/playwright/v1.64.0/utils/docker/seccomp_profile.json -o "$cfg/chromium-seccomp.json"
+          chmod 444 "$cfg"/*
+          echo "SCARLET_SECRETS_DIR=$cfg" >> "$GITHUB_ENV"
+          echo "SCARLET_SECCOMP_PATH=$cfg/chromium-seccomp.json" >> "$GITHUB_ENV"
+      - run: docker compose config --quiet
+      - run: docker compose up --build --detach --wait --wait-timeout 300
+      - name: Check TLS proxy configuration
+        run: docker compose --profile https run --rm -T --no-deps proxy caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
+      - name: Check database roles, vector extension and application job completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose exec -T web scarlet-env node --input-type=module <<'JS'
+          import pg from 'pg';
+          const db = new pg.Client({connectionString:process.env.DATABASE_URL});
+          await db.connect();
+          const { rows: [r] } = await db.query("SELECT current_user AS name, has_schema_privilege(current_user,'public','CREATE') AS ddl, EXISTS(SELECT FROM pg_extension WHERE extname='vector') AS vector");
+          if (r.name !== 'scarlet_app' || r.ddl || !r.vector) throw Error('Unexpected database privileges or extension state.');
+          await db.end();
+          JS
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base = 'http://localhost:3000';
+          const headers = {'Content-Type':'application/json', Origin:base};
+          const sign = await fetch(base + '/api/auth/guest', {method:'POST', headers, body:'{}'});
+          assert.equal(sign.status,200);
+          headers.Cookie = sign.headers.get('set-cookie').split(';')[0];
+          const add = await fetch(base+'/api/task',{method:'POST',headers,body:JSON.stringify({kind:'task',title:'CI worker health check'})});
+          assert.equal(add.status,200);
+          const {id} = await add.json();
+          let state;
+          for(let i=0;i<35;i++){
+            const response = await fetch(base+'/api/tasks/'+id,{headers});
+            assert.equal(response.status,200);
+            state=(await response.json()).state;
+            if (['COMPLETED','FAILED','CANCELLED'].includes(state)) break;
+            await new Promise(resolve=>setTimeout(resolve,1000));
+          }
+          assert.equal(state,'COMPLETED');
+          JS
+      - name: Remove ephemeral services
+        if: always()
+        run: docker compose down --volumes --remove-orphans

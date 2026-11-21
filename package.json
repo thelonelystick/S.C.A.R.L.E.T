@@ -1,14 +1,71 @@
 {
-  "name": "scarlet",
-  "private": true,
+  "name": "scarlet-command-center",
   "version": "1.0.0",
-  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.16.0"
+  },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1",
+    "migrate": "node --env-file-if-exists=.env --import tsx scripts/migrate.ts",
+    "worker": "node --env-file-if-exists=.env --import tsx scripts/worker.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint app components lib scripts tests --ext .ts,.tsx",
+    "test:e2e": "node --import tsx scripts/e2e.ts",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.3.16",
+    "@fontsource/barlow": "5.3.0",
+    "@fontsource/barlow-condensed": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@prisma/client": "6.19.3",
+    "@radix-ui/react-slot": "1.5.0",
+    "bullmq": "5.81.6",
+    "class-variance-authority": "0.7.1",
+    "fast-xml-parser": "5.12.1",
+    "ioredis": "5.11.1",
+    "lucide-react": "0.468.0",
+    "motion": "12.43.0",
+    "next": "15.5.29",
+    "openai": "6.49.0",
+    "otplib": "12.0.1",
+    "pdf-parse": "2.4.5",
+    "pg": "8.23.1",
+    "playwright-core": "1.64.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "sharp": "0.35.5",
+    "tsx": "4.23.15",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "vite": "^8.3.6"
+    "@axe-core/playwright": "4.14.0",
+    "@next/eslint-plugin-next": "15.5.29",
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@typescript-eslint/eslint-plugin": "8.73.0",
+    "@typescript-eslint/parser": "8.73.0",
+    "autoprefixer": "10.7.0",
+    "eslint": "8.57.1",
+    "postcss": "8.5.33",
+    "prisma": "6.19.3",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.33",
+      "sharp": "0.35.5"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2",
+      "effect": "3.22.5"
+    }
   }
 }

@@ -1,2 +1,9 @@
 node_modules/
-dist/
+.next/
+.scarlet/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+test-results/
+.next-dev/

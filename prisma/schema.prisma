@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model approvals {
+  id         String    @id
+  user_id    String
+  task_id    String    @unique
+  status     String    @default("pending")
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  tasks      tasks     @relation(fields: [user_id, task_id], references: [user_id, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, task_id], map: "approvals_owner_task")
+}
+
+model audits {
+  id         String    @id
+  user_id    String
+  title      String
+  detail     String    @default("")
+  kind       String
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, created_at(sort: Desc)], map: "audit_feed")
+}
+
+model connections {
+  user_id     String
+  kind        String
+  secret      String
+  label       String
+  external_id String?
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  wa_binding  String?
+  users       users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, kind])
+}
+
+model conversations {
+  id         String     @id
+  user_id    String
+  title      String
+  created_at DateTime?  @default(now()) @db.Timestamptz(6)
+  users      users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages   messages[]
+
+  @@unique([user_id, id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model document_passages {
+  user_id      String
+  document_id  String
+  part         Int
+  body         String
+  terms        Unsupported("tsvector")? @default(dbgenerated("to_tsvector('simple'::regconfig, body)"))
+  vec          Unsupported("vector")?
+  vector_model String?
+  documents    documents                @relation(fields: [user_id, document_id], references: [user_id, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, document_id, part])
+  @@index([terms], map: "document_passages_terms", type: Gin)
+}
+
+model documents {
+  id                String              @id
+  user_id           String
+  name              String
+  mime              String
+  size              Int
+  body              String
+  original          String
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  document_passages document_passages[]
+  users             users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, id], map: "documents_owner_id")
+  @@index([user_id], map: "doc_owner")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model events {
+  id       String   @id
+  user_id  String
+  title    String
+  start_at DateTime @db.Timestamptz(6)
+  end_at   DateTime @db.Timestamptz(6)
+  users    users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model identity_challenges {
+  digest  String   @id
+  user_id String
+  purpose String
+  expires DateTime @db.Timestamptz(6)
+  users   users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, purpose])
+}
+
+model memories {
+  id           String                 @id
+  user_id      String
+  title        String
+  body         String
+  category     String                 @default("Preference")
+  embedding    Json?
+  expires      DateTime?              @db.Timestamptz(6)
+  created_at   DateTime?              @default(now()) @db.Timestamptz(6)
+  vec          Unsupported("vector")?
+  vector_model String?
+  users        users                  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "memory_owner")
+}
+
+model messages {
+  id              String        @id
+  user_id         String
+  conversation_id String
+  role            String
+  body            String
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  seq             BigInt        @default(autoincrement())
+  conversations   conversations @relation(fields: [user_id, conversation_id], references: [user_id, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, conversation_id, seq], map: "messages_owner_order")
+  @@index([user_id, conversation_id, created_at], map: "msg_history")
+}
+
+model notifications {
+  id         String    @id
+  user_id    String
+  body       String
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model oauth_states {
+  state    String   @id
+  user_id  String
+  verifier String
+  kind     String
+  expires  DateTime @db.Timestamptz(6)
+  users    users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model sessions {
+  hash    String   @id
+  user_id String
+  expires DateTime @db.Timestamptz(6)
+  users   users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "sessions_user")
+}
+
+model steps {
+  id         String    @id
+  user_id    String
+  task_id    String
+  body       String
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  tasks      tasks     @relation(fields: [user_id, task_id], references: [user_id, id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tasks {
+  id             String          @id
+  user_id        String
+  title          String
+  kind           String
+  state          String
+  payload        Json            @default("{}")
+  result         Json?
+  error          String?
+  run_at         DateTime        @default(now()) @db.Timestamptz(6)
+  attempts       Int             @default(0)
+  created_at     DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?       @default(now()) @db.Timestamptz(6)
+  revision       BigInt          @default(1)
+  approvals      approvals?
+  steps          steps[]
+  users          users           @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  wa_dispatches  wa_dispatches?
+  wa_reply_slots wa_reply_slots?
+
+  @@unique([user_id, id])
+  @@index([user_id, created_at(sort: Desc)], map: "task_owner")
+  @@index([state, run_at], map: "task_queue")
+}
+
+model usage {
+  bucket  String   @id
+  n       Int
+  expires DateTime @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                  String                @id
+  email               String?               @unique
+  name                String
+  passhash            String?
+  role                String                @default("USER")
+  guest               Boolean               @default(false)
+  settings            Json                  @default("{}")
+  mfa                 String?
+  created_at          DateTime              @default(now()) @db.Timestamptz(6)
+  email_verified      Boolean               @default(false)
+  audits              audits[]
+  connections         connections[]
+  conversations       conversations[]
+  documents           documents[]
+  events              events[]
+  identity_challenges identity_challenges[]
+  memories            memories[]
+  notifications       notifications[]
+  oauth_states        oauth_states[]
+  sessions            sessions[]
+  tasks               tasks[]
+  wa_handoffs         wa_handoffs[]
+  wa_messages         wa_messages[]
+  wa_reply_slots      wa_reply_slots[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model wa_dispatches {
+  task_id     String   @id
+  user_id     String
+  phone_id    String
+  contact     String
+  mode        String
+  provider_id String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  tasks       tasks    @relation(fields: [user_id, task_id], references: [user_id, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, task_id], map: "dispatch_owner_task")
+  @@index([user_id, phone_id, created_at(sort: Desc)], map: "wa_send_budget")
+}
+
+model wa_handoffs {
+  user_id  String
+  contact  String
+  reason   String
+  phone_id String @default("")
+  users    users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, phone_id, contact])
+}
+
+model wa_messages {
+  id             String           @id
+  user_id        String
+  contact        String
+  body           String
+  direction      String
+  created_at     DateTime         @db.Timestamptz(6)
+  phone_id       String?
+  users          users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  wa_reply_slots wa_reply_slots[]
+
+  @@index([user_id, phone_id, contact, created_at(sort: Desc)], map: "wa_phone_history")
+  @@index([user_id, contact, created_at(sort: Desc)], map: "wa_threads")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model wa_reply_slots {
+  user_id     String
+  task_id     String      @id
+  phone_id    String
+  inbound_id  String
+  mode        String
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  wa_messages wa_messages @relation(fields: [inbound_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tasks       tasks       @relation(fields: [user_id, task_id], references: [user_id, id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, task_id], map: "reply_owner_task")
+  @@unique([user_id, phone_id, inbound_id])
+  @@index([user_id, phone_id, created_at(sort: Desc)], map: "wa_reply_budget")
+}
